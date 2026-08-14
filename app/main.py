@@ -1,22 +1,23 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
+from app.validator import validate_manifest
 
-app = FastAPI(
-    title='AgentOps Governance Control Plane',
-    version='0.1.0'
-)
-
-
-@app.get('/')
-def root():
-    return {
-        'service': 'AgentOps Governance Control Plane',
-        'version': '0.1.0'
-    }
+app = FastAPI()
 
 
-@app.get('/health')
-def health_check():
-    return {
-        'status': 'healthy',
-        'service': 'AgentOps Governance Control Plane'
-    }
+class ManifestRequest(BaseModel):
+    manifest_path: str
+    schema_path: str
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.post("/validate-manifest")
+def validate_agent_manifest(request: ManifestRequest):
+    return validate_manifest(
+        request.manifest_path,
+        request.schema_path
+    )
