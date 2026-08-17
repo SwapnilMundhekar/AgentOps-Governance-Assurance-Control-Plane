@@ -22,14 +22,28 @@ def init_db():
 
 def register_agent(name: str, version: str, manifest_path: str):
     conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
 
-    cursor.execute("""
-        INSERT INTO agents (name, version, manifest_path)
-        VALUES (?, ?, ?)
-    """, (name, version, manifest_path))
+    try:
+        cursor = conn.cursor()
 
-    conn.commit()
-    conn.close()
+        cursor.execute("""
+            INSERT INTO agents (name, version, manifest_path)
+            VALUES (?, ?, ?)
+        """, (name, version, manifest_path))
 
-    return {"registered": True, "name": name}
+        conn.commit()
+
+        return {
+            "registered": True,
+            "name": name,
+            "version": version
+        }
+
+    except sqlite3.IntegrityError:
+        return {
+            "registered": False,
+            "error": f"Agent '{name}' already exists"
+        }
+
+    finally:
+        conn.close()
