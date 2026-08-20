@@ -4,6 +4,7 @@ import yaml
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.audit import init_audit_db, log_governance_decision
 from app.models import AgentActionRequest, GovernanceDecision
 from app.registry import init_db, register_agent
 from app.validator import validate_manifest
@@ -12,12 +13,13 @@ from app.validator import validate_manifest
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    init_audit_db()
     yield
 
 
 app = FastAPI(
     title="AgentOps Governance & Assurance Control Plane",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan
 )
 
@@ -81,21 +83,33 @@ def register_agent_api(request: ManifestRequest):
 def evaluate_action(request: AgentActionRequest):
 
     if request.risk_score >= 0.8:
-        return GovernanceDecision(
+        decision = GovernanceDecision(
             decision="BLOCK",
             reason="Risk score exceeds governance threshold.",
             requires_human_review=True
         )
 
-    if request.risk_score >= 0.5:
-        return GovernanceDecision(
+    elif request.risk_score >= 0.5:
+        decision = GovernanceDecision(
             decision="REVIEW",
             reason="Action requires human approval.",
             requires_human_review=True
         )
 
-    return GovernanceDecision(
-        decision="ALLOW",
-        reason="Action is within permitted risk threshold.",
-        requires_human_review=False
+    else:
+        decision = GovernanceDecision(
+            decision="ALLOW",
+            reason="Action is within permitted risk threshold.",
+            requires_human_review=False
+        )
+
+    log_governance_decision(
+        agent_id=request.agent_id,
+        action=request.action,
+        risk_score=request.risk_score,
+        decision=decision.decision,
+        reason=decision.reason,
+        requires_human_review=decision.requires_human_review
     )
+
+    return decision
