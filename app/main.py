@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import FastAPI, HTTPException, Query
 
 from app.audit import get_audit_records, log_governance_decision
@@ -5,8 +7,11 @@ from app.models import AgentActionRequest, GovernanceDecision
 
 app = FastAPI(
     title="AgentOps Governance & Assurance Control Plane",
-    description="Governance, assurance, policy evaluation, and audit control plane for AI agents.",
-    version="0.4.0",
+    description=(
+        "Governance, assurance, policy evaluation, "
+        "and audit control plane for AI agents."
+    ),
+    version="0.5.0",
 )
 
 
@@ -14,7 +19,7 @@ app = FastAPI(
 def root():
     return {
         "service": "AgentOps Governance & Assurance Control Plane",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "status": "running",
     }
 
@@ -135,10 +140,27 @@ def get_audit(
         le=500,
         description="Maximum number of audit records to return.",
     ),
+    agent_id: str | None = Query(
+        default=None,
+        description="Filter audit records by agent ID.",
+    ),
+    decision: Literal["ALLOW", "REVIEW", "BLOCK"] | None = Query(
+        default=None,
+        description="Filter audit records by governance decision.",
+    ),
 ):
-    records = get_audit_records(limit)
+    records = get_audit_records(
+        limit=limit,
+        agent_id=agent_id,
+        decision=decision,
+    )
 
     return {
         "count": len(records),
+        "filters": {
+            "agent_id": agent_id,
+            "decision": decision,
+            "limit": limit,
+        },
         "records": records,
     }

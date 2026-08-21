@@ -72,12 +72,15 @@ def log_governance_decision(
         connection.close()
 
 
-def get_audit_records(limit: int = 50):
+def get_audit_records(
+    limit: int = 50,
+    agent_id: str | None = None,
+    decision: str | None = None,
+):
     connection = get_connection()
 
     try:
-        rows = connection.execute(
-            """
+        query = """
             SELECT
                 id,
                 agent_id,
@@ -87,10 +90,25 @@ def get_audit_records(limit: int = 50):
                 reason,
                 created_at
             FROM governance_audit
-            ORDER BY id DESC
-            LIMIT ?
-            """,
-            (limit,),
+            WHERE 1 = 1
+        """
+
+        parameters = []
+
+        if agent_id is not None:
+            query += " AND agent_id = ?"
+            parameters.append(agent_id)
+
+        if decision is not None:
+            query += " AND decision = ?"
+            parameters.append(decision)
+
+        query += " ORDER BY id DESC LIMIT ?"
+        parameters.append(limit)
+
+        rows = connection.execute(
+            query,
+            parameters,
         ).fetchall()
 
         return [dict(row) for row in rows]
