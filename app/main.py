@@ -2,8 +2,24 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 
-from app.audit import get_audit_records, log_governance_decision
-from app.models import AgentActionRequest, GovernanceDecision
+from app.audit import (
+    get_audit_records,
+    log_governance_decision,
+)
+
+from app.models import (
+    AgentActionRequest,
+    GovernanceDecision,
+    PolicyCreate,
+)
+
+from app.policies import (
+    activate_policy,
+    create_policy,
+    get_active_policy,
+    get_policies,
+)
+
 
 app = FastAPI(
     title="AgentOps Governance & Assurance Control Plane",
@@ -11,15 +27,17 @@ app = FastAPI(
         "Governance, assurance, policy evaluation, "
         "and audit control plane for AI agents."
     ),
-    version="0.5.0",
+    version="0.6.0",
 )
 
 
 @app.get("/")
 def root():
     return {
-        "service": "AgentOps Governance & Assurance Control Plane",
-        "version": "0.5.0",
+        "service": (
+            "AgentOps Governance & Assurance Control Plane"
+        ),
+        "version": "0.6.0",
         "status": "running",
     }
 
@@ -103,22 +121,43 @@ def register_agent(manifest: dict):
 def evaluate_governance(
     request: AgentActionRequest,
 ):
-    if request.risk_score >= 0.8:
-        decision = "BLOCK"
-        reason = "Risk score exceeds the blocking threshold."
+    policy = get_active_policy()
 
-    elif request.risk_score >= 0.5:
+    if policy is None:
+        raise HTTPException(
+            status_code=500,
+            detail="No active governance policy.",
+        )
+
+    review_threshold = policy["review_threshold"]
+    block_threshold = policy["block_threshold"]
+
+    if request.risk_score >= block_threshold:
+        decision = "BLOCK"
+        reason = (
+            f"Risk score exceeds block threshold "
+            f"{block_threshold}."
+        )
+
+    elif request.risk_score >= review_threshold:
         decision = "REVIEW"
-        reason = "Risk score requires human review."
+        reason = (
+            f"Risk score exceeds review threshold "
+            f"{review_threshold}."
+        )
 
     else:
         decision = "ALLOW"
-        reason = "Risk score is within the allowed threshold."
+        reason = (
+            "Risk score is below the review threshold."
+        )
 
     result = GovernanceDecision(
         decision=decision,
         reason=reason,
         risk_score=request.risk_score,
+        policy_id=policy["id"],
+        policy_name=policy["name"],
     )
 
     log_governance_decision(
@@ -138,15 +177,16 @@ def get_audit(
         default=50,
         ge=1,
         le=500,
-        description="Maximum number of audit records to return.",
     ),
     agent_id: str | None = Query(
         default=None,
-        description="Filter audit records by agent ID.",
     ),
-    decision: Literal["ALLOW", "REVIEW", "BLOCK"] | None = Query(
+    decision: Literal[
+        "ALLOW",
+        "REVIEW",
+        "BLOCK",
+    ] | None = Query(
         default=None,
-        description="Filter audit records by governance decision.",
     ),
 ):
     records = get_audit_records(
@@ -163,4 +203,63 @@ def get_audit(
             "limit": limit,
         },
         "records": records,
+    }
+
+
+@app.get("/policies")
+def list_policies():
+    policies = get_policies()
+
+    return {
+        "count": len(policies),
+        "policies": policies,
+    }
+
+
+@app.post("/policies")
+def add_policy(policy: PolicyCreate):
+    if (
+        policy.review_threshold
+        >= policy.block_threshold
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "review_threshold must be lower "
+                "than block_threshold."
+            ),
+        )
+
+    try:
+        created_policy = create_policy(
+            name=policy.name,
+            review_threshold=policy.review_threshold,
+            block_threshold=policy.block_threshold,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    return {
+        "message": "Governance policy created.",
+        "policy": created_policy,
+    }
+
+
+@app.post("/policies/{policy_id}/activate")
+def set_active_policy(policy_id: int):
+    policy = activate_policy(policy_id)
+
+    if policy is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Governance policy not found.",
+        )
+
+    return {
+        "message": "Governance policy activated.",
+        "policy": policy,
     }
