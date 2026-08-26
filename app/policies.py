@@ -19,6 +19,7 @@ def init_policy_table():
             CREATE TABLE IF NOT EXISTS governance_policies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
                 review_threshold REAL NOT NULL,
                 block_threshold REAL NOT NULL,
                 active INTEGER NOT NULL DEFAULT 0,
@@ -26,6 +27,25 @@ def init_policy_table():
             )
             """
         )
+
+        columns = connection.execute(
+            """
+            PRAGMA table_info(governance_policies)
+            """
+        ).fetchall()
+
+        column_names = {
+            column["name"]
+            for column in columns
+        }
+
+        if "version" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE governance_policies
+                ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+                """
+            )
 
         existing = connection.execute(
             """
@@ -39,15 +59,17 @@ def init_policy_table():
                 """
                 INSERT INTO governance_policies (
                     name,
+                    version,
                     review_threshold,
                     block_threshold,
                     active,
                     created_at
                 )
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     "default-risk-policy",
+                    1,
                     0.5,
                     0.8,
                     1,
@@ -73,15 +95,17 @@ def create_policy(
             """
             INSERT INTO governance_policies (
                 name,
+                version,
                 review_threshold,
                 block_threshold,
                 active,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
                 name,
+                1,
                 review_threshold,
                 block_threshold,
                 0,
@@ -136,7 +160,10 @@ def get_policies():
             """
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     finally:
         connection.close()

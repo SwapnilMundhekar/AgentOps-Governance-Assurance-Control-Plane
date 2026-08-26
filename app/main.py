@@ -27,7 +27,7 @@ app = FastAPI(
         "Governance, assurance, policy evaluation, "
         "and audit control plane for AI agents."
     ),
-    version="0.6.0",
+    version="0.7.0",
 )
 
 
@@ -37,7 +37,7 @@ def root():
         "service": (
             "AgentOps Governance & Assurance Control Plane"
         ),
-        "version": "0.6.0",
+        "version": "0.7.0",
         "status": "running",
     }
 
@@ -134,6 +134,7 @@ def evaluate_governance(
 
     if request.risk_score >= block_threshold:
         decision = "BLOCK"
+
         reason = (
             f"Risk score exceeds block threshold "
             f"{block_threshold}."
@@ -141,6 +142,7 @@ def evaluate_governance(
 
     elif request.risk_score >= review_threshold:
         decision = "REVIEW"
+
         reason = (
             f"Risk score exceeds review threshold "
             f"{review_threshold}."
@@ -148,6 +150,7 @@ def evaluate_governance(
 
     else:
         decision = "ALLOW"
+
         reason = (
             "Risk score is below the review threshold."
         )
@@ -158,6 +161,7 @@ def evaluate_governance(
         risk_score=request.risk_score,
         policy_id=policy["id"],
         policy_name=policy["name"],
+        policy_version=policy["version"],
     )
 
     log_governance_decision(
@@ -166,6 +170,9 @@ def evaluate_governance(
         risk_score=request.risk_score,
         decision=decision,
         reason=reason,
+        policy_id=policy["id"],
+        policy_name=policy["name"],
+        policy_version=policy["version"],
     )
 
     return result
@@ -188,11 +195,16 @@ def get_audit(
     ] | None = Query(
         default=None,
     ),
+    policy_id: int | None = Query(
+        default=None,
+        ge=1,
+    ),
 ):
     records = get_audit_records(
         limit=limit,
         agent_id=agent_id,
         decision=decision,
+        policy_id=policy_id,
     )
 
     return {
@@ -200,6 +212,7 @@ def get_audit(
         "filters": {
             "agent_id": agent_id,
             "decision": decision,
+            "policy_id": policy_id,
             "limit": limit,
         },
         "records": records,
@@ -217,7 +230,9 @@ def list_policies():
 
 
 @app.post("/policies")
-def add_policy(policy: PolicyCreate):
+def add_policy(
+    policy: PolicyCreate,
+):
     if (
         policy.review_threshold
         >= policy.block_threshold
@@ -250,8 +265,12 @@ def add_policy(policy: PolicyCreate):
 
 
 @app.post("/policies/{policy_id}/activate")
-def set_active_policy(policy_id: int):
-    policy = activate_policy(policy_id)
+def set_active_policy(
+    policy_id: int,
+):
+    policy = activate_policy(
+        policy_id
+    )
 
     if policy is None:
         raise HTTPException(

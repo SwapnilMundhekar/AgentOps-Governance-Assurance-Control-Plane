@@ -23,10 +23,48 @@ def init_audit_table():
                 risk_score REAL NOT NULL,
                 decision TEXT NOT NULL,
                 reason TEXT NOT NULL,
+                policy_id INTEGER,
+                policy_name TEXT,
+                policy_version INTEGER,
                 created_at TEXT NOT NULL
             )
             """
         )
+
+        columns = connection.execute(
+            """
+            PRAGMA table_info(governance_audit)
+            """
+        ).fetchall()
+
+        column_names = {
+            column["name"]
+            for column in columns
+        }
+
+        if "policy_id" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE governance_audit
+                ADD COLUMN policy_id INTEGER
+                """
+            )
+
+        if "policy_name" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE governance_audit
+                ADD COLUMN policy_name TEXT
+                """
+            )
+
+        if "policy_version" not in column_names:
+            connection.execute(
+                """
+                ALTER TABLE governance_audit
+                ADD COLUMN policy_version INTEGER
+                """
+            )
 
         connection.commit()
 
@@ -40,6 +78,9 @@ def log_governance_decision(
     risk_score: float,
     decision: str,
     reason: str,
+    policy_id: int,
+    policy_name: str,
+    policy_version: int,
 ):
     connection = get_connection()
 
@@ -52,9 +93,12 @@ def log_governance_decision(
                 risk_score,
                 decision,
                 reason,
+                policy_id,
+                policy_name,
+                policy_version,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 agent_id,
@@ -62,6 +106,9 @@ def log_governance_decision(
                 risk_score,
                 decision,
                 reason,
+                policy_id,
+                policy_name,
+                policy_version,
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
@@ -76,6 +123,7 @@ def get_audit_records(
     limit: int = 50,
     agent_id: str | None = None,
     decision: str | None = None,
+    policy_id: int | None = None,
 ):
     connection = get_connection()
 
@@ -88,6 +136,9 @@ def get_audit_records(
                 risk_score,
                 decision,
                 reason,
+                policy_id,
+                policy_name,
+                policy_version,
                 created_at
             FROM governance_audit
             WHERE 1 = 1
@@ -103,6 +154,10 @@ def get_audit_records(
             query += " AND decision = ?"
             parameters.append(decision)
 
+        if policy_id is not None:
+            query += " AND policy_id = ?"
+            parameters.append(policy_id)
+
         query += " ORDER BY id DESC LIMIT ?"
         parameters.append(limit)
 
@@ -111,7 +166,10 @@ def get_audit_records(
             parameters,
         ).fetchall()
 
-        return [dict(row) for row in rows]
+        return [
+            dict(row)
+            for row in rows
+        ]
 
     finally:
         connection.close()
