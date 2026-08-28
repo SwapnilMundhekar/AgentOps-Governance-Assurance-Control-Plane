@@ -10,14 +10,19 @@ from app.audit import (
 from app.models import (
     AgentActionRequest,
     GovernanceDecision,
+    PolicyApprovalRequest,
     PolicyCreate,
+    PolicyVersionCreate,
 )
 
 from app.policies import (
     activate_policy,
+    approve_policy,
     create_policy,
+    create_policy_version,
     get_active_policy,
     get_policies,
+    get_policy_versions,
 )
 
 
@@ -27,7 +32,7 @@ app = FastAPI(
         "Governance, assurance, policy evaluation, "
         "and audit control plane for AI agents."
     ),
-    version="0.7.0",
+    version="0.9.0",
 )
 
 
@@ -37,7 +42,7 @@ def root():
         "service": (
             "AgentOps Governance & Assurance Control Plane"
         ),
-        "version": "0.7.0",
+        "version": "0.9.0",
         "status": "running",
     }
 
@@ -259,8 +264,103 @@ def add_policy(
         ) from exc
 
     return {
-        "message": "Governance policy created.",
+        "message": (
+            "Governance policy created as DRAFT."
+        ),
         "policy": created_policy,
+    }
+
+
+@app.get("/policies/{policy_id}/versions")
+def list_policy_versions(
+    policy_id: int,
+):
+    versions = get_policy_versions(
+        policy_id
+    )
+
+    if versions is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Governance policy not found.",
+        )
+
+    return {
+        "count": len(versions),
+        "versions": versions,
+    }
+
+
+@app.post("/policies/{policy_id}/versions")
+def add_policy_version(
+    policy_id: int,
+    policy: PolicyVersionCreate,
+):
+    if (
+        policy.review_threshold
+        >= policy.block_threshold
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "review_threshold must be lower "
+                "than block_threshold."
+            ),
+        )
+
+    try:
+        new_version = create_policy_version(
+            policy_id=policy_id,
+            review_threshold=policy.review_threshold,
+            block_threshold=policy.block_threshold,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    if new_version is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Governance policy not found.",
+        )
+
+    return {
+        "message": (
+            "New policy version created as DRAFT."
+        ),
+        "policy": new_version,
+    }
+
+
+@app.post("/policies/{policy_id}/approve")
+def approve_governance_policy(
+    policy_id: int,
+    request: PolicyApprovalRequest,
+):
+    try:
+        policy = approve_policy(
+            policy_id=policy_id,
+            approved_by=request.approved_by,
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    if policy is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Governance policy not found.",
+        )
+
+    return {
+        "message": "Governance policy approved.",
+        "policy": policy,
     }
 
 
@@ -268,9 +368,16 @@ def add_policy(
 def set_active_policy(
     policy_id: int,
 ):
-    policy = activate_policy(
-        policy_id
-    )
+    try:
+        policy = activate_policy(
+            policy_id
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
 
     if policy is None:
         raise HTTPException(

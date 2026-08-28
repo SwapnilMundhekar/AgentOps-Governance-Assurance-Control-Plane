@@ -47,3 +47,22 @@ class PolicyCreate(BaseModel):
         ge=0.0,
         le=1.0,
     )
+
+
+class PolicyVersionCreate(BaseModel):
+    review_threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+    block_threshold: float = Field(
+        ge=0.0,
+        le=1.0,
+    )
+
+
+class PolicyApprovalRequest(BaseModel):
+    approved_by: str = Field(
+        min_length=1,
+        max_length=100,
+    )
