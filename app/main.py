@@ -2,6 +2,12 @@ from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
 
+from app.agents import (
+    get_agents,
+    get_agent_versions,
+    register_agent_record,
+)
+
 from app.audit import (
     get_audit_records,
     log_governance_decision,
@@ -9,6 +15,7 @@ from app.audit import (
 
 from app.models import (
     AgentActionRequest,
+    AgentRegisterRequest,
     GovernanceDecision,
     PolicyApprovalRequest,
     PolicyCreate,
@@ -30,9 +37,10 @@ app = FastAPI(
     title="AgentOps Governance & Assurance Control Plane",
     description=(
         "Governance, assurance, policy evaluation, "
-        "and audit control plane for AI agents."
+        "agent registry, and audit control plane "
+        "for AI agents."
     ),
-    version="0.9.0",
+    version="1.0.0",
 )
 
 
@@ -42,7 +50,7 @@ def root():
         "service": (
             "AgentOps Governance & Assurance Control Plane"
         ),
-        "version": "0.9.0",
+        "version": "1.0.0",
         "status": "running",
     }
 
@@ -56,7 +64,9 @@ def health():
 
 
 @app.post("/validate-manifest")
-def validate_manifest(manifest: dict):
+def validate_manifest(
+    manifest: dict,
+):
     required_fields = [
         "agent_id",
         "name",
@@ -87,35 +97,94 @@ def validate_manifest(manifest: dict):
     }
 
 
-@app.post("/register-agent")
-def register_agent(manifest: dict):
-    required_fields = [
-        "agent_id",
-        "name",
-        "version",
-        "owner",
-        "purpose",
-    ]
-
-    missing_fields = [
-        field
-        for field in required_fields
-        if field not in manifest
-    ]
-
-    if missing_fields:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "registered": False,
-                "missing_fields": missing_fields,
-            },
+@app.post(
+    "/register-agent",
+    status_code=201,
+)
+def register_agent(
+    agent: AgentRegisterRequest,
+):
+    try:
+        registered_agent = register_agent_record(
+            agent_id=agent.agent_id,
+            name=agent.name,
+            version=agent.version,
+            owner=agent.owner,
+            purpose=agent.purpose,
+            risk_tier=agent.risk_tier,
         )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
 
     return {
         "registered": True,
-        "agent_id": manifest["agent_id"],
         "message": "Agent registered successfully.",
+        "agent": registered_agent,
+    }
+
+
+@app.get("/agents")
+def list_agents(
+    limit: int = Query(
+        default=50,
+        ge=1,
+        le=500,
+    ),
+    status: Literal[
+        "REGISTERED",
+        "SUSPENDED",
+        "RETIRED",
+    ] | None = Query(
+        default=None,
+    ),
+    risk_tier: Literal[
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL",
+    ] | None = Query(
+        default=None,
+    ),
+):
+    agents = get_agents(
+        limit=limit,
+        status=status,
+        risk_tier=risk_tier,
+    )
+
+    return {
+        "count": len(agents),
+        "filters": {
+            "status": status,
+            "risk_tier": risk_tier,
+            "limit": limit,
+        },
+        "agents": agents,
+    }
+
+
+@app.get("/agents/{agent_id}")
+def get_registered_agent(
+    agent_id: str,
+):
+    versions = get_agent_versions(
+        agent_id
+    )
+
+    if not versions:
+        raise HTTPException(
+            status_code=404,
+            detail="Agent not found.",
+        )
+
+    return {
+        "agent_id": agent_id,
+        "count": len(versions),
+        "versions": versions,
     }
 
 
@@ -134,10 +203,18 @@ def evaluate_governance(
             detail="No active governance policy.",
         )
 
-    review_threshold = policy["review_threshold"]
-    block_threshold = policy["block_threshold"]
+    review_threshold = (
+        policy["review_threshold"]
+    )
 
-    if request.risk_score >= block_threshold:
+    block_threshold = (
+        policy["block_threshold"]
+    )
+
+    if (
+        request.risk_score
+        >= block_threshold
+    ):
         decision = "BLOCK"
 
         reason = (
@@ -145,7 +222,10 @@ def evaluate_governance(
             f"{block_threshold}."
         )
 
-    elif request.risk_score >= review_threshold:
+    elif (
+        request.risk_score
+        >= review_threshold
+    ):
         decision = "REVIEW"
 
         reason = (
@@ -157,7 +237,8 @@ def evaluate_governance(
         decision = "ALLOW"
 
         reason = (
-            "Risk score is below the review threshold."
+            "Risk score is below the "
+            "review threshold."
         )
 
     result = GovernanceDecision(
@@ -253,8 +334,12 @@ def add_policy(
     try:
         created_policy = create_policy(
             name=policy.name,
-            review_threshold=policy.review_threshold,
-            block_threshold=policy.block_threshold,
+            review_threshold=(
+                policy.review_threshold
+            ),
+            block_threshold=(
+                policy.block_threshold
+            ),
         )
 
     except ValueError as exc:
@@ -271,7 +356,9 @@ def add_policy(
     }
 
 
-@app.get("/policies/{policy_id}/versions")
+@app.get(
+    "/policies/{policy_id}/versions"
+)
 def list_policy_versions(
     policy_id: int,
 ):
@@ -291,7 +378,9 @@ def list_policy_versions(
     }
 
 
-@app.post("/policies/{policy_id}/versions")
+@app.post(
+    "/policies/{policy_id}/versions"
+)
 def add_policy_version(
     policy_id: int,
     policy: PolicyVersionCreate,
@@ -311,8 +400,12 @@ def add_policy_version(
     try:
         new_version = create_policy_version(
             policy_id=policy_id,
-            review_threshold=policy.review_threshold,
-            block_threshold=policy.block_threshold,
+            review_threshold=(
+                policy.review_threshold
+            ),
+            block_threshold=(
+                policy.block_threshold
+            ),
         )
 
     except ValueError as exc:
@@ -335,7 +428,9 @@ def add_policy_version(
     }
 
 
-@app.post("/policies/{policy_id}/approve")
+@app.post(
+    "/policies/{policy_id}/approve"
+)
 def approve_governance_policy(
     policy_id: int,
     request: PolicyApprovalRequest,
@@ -364,7 +459,9 @@ def approve_governance_policy(
     }
 
 
-@app.post("/policies/{policy_id}/activate")
+@app.post(
+    "/policies/{policy_id}/activate"
+)
 def set_active_policy(
     policy_id: int,
 ):
