@@ -1,637 +1,758 @@
-# AgentOps Governance & Assurance Control Plane
+<div align="center">
 
-> **Policy-enforced, evidence-first governance for enterprise AI agents.**
+# 🛡️ AgentOps Governance & Assurance Control Plane
 
-The AgentOps Governance & Assurance Control Plane is an open-source platform for registering, evaluating, authorising, monitoring, investigating, and auditing AI agents across their full lifecycle.
+### Runtime governance, policy enforcement and assurance for enterprise AI agents
 
-It is designed for organisations moving from isolated copilots to **tool-using, stateful, multi-agent systems** where conventional application monitoring is not enough.
+[![Typing SVG](https://readme-typing-svg.herokuapp.com?font=Fira+Code\&weight=600\&size=22\&pause=1000\&color=2F81F7\&center=true\&vCenter=true\&width=900\&lines=Govern+AI+agents+before+they+act.;Version+policies.+Approve+changes.+Enforce+lifecycle.;Trace+every+ALLOW%2C+REVIEW%2C+and+BLOCK+decision.)](https://git.io/typing-svg)
 
-## Why this project exists
+![Python](https://img.shields.io/badge/Language-Python-3776AB?logo=python\&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi\&logoColor=white)
+![SQLite](https://img.shields.io/badge/Registry-SQLite-003B57?logo=sqlite\&logoColor=white)
+![Governance](https://img.shields.io/badge/Focus-AI_Agent_Governance-7C3AED)
+![Version](https://img.shields.io/badge/version-1.1.0-2F81F7)
+![Status](https://img.shields.io/badge/status-active_development-orange)
 
-Enterprise agents can:
+**Agent Registry • Lifecycle Enforcement • Policy Versioning • Approval Workflow • Runtime Decisions • Audit Traceability**
 
-- call internal and external tools
-- access sensitive data
-- delegate work to other agents
-- retain memory across sessions
-- initiate high-impact business actions
-- change behaviour when prompts, models, tools, or data change
+[Overview](#-overview) •
+[Architecture](#-architecture) •
+[Governance Flow](#-runtime-governance-flow) •
+[Policies](#-policy-lifecycle) •
+[API](#-api-surface) •
+[Quick Start](#-quick-start) •
+[Roadmap](#-roadmap)
 
-Most teams can observe an agent trace. Far fewer can answer:
-
-- Which agent was authorised to perform this action?
-- Which policy allowed or denied it?
-- What model, prompt, tool, data source, and memory influenced the outcome?
-- Was human approval required and obtained?
-- Which release evaluation justified deployment?
-- What evidence can be supplied to risk, audit, compliance, or an external assessor?
-- Can the action be paused, overridden, replayed, or shut down?
-
-This project turns those questions into a working control plane.
+</div>
 
 ---
 
-## Core principle
+## 🎯 Overview
 
-> **LLMs recommend. Deterministic controls enforce.**
+**AgentOps Governance & Assurance Control Plane** is an API-first control layer for governing AI agents before they execute sensitive or high-risk actions.
 
-LLM-powered assurance agents may classify risk, propose controls, analyse incidents, and draft reports. They do **not** make final authorisation decisions.
+Instead of allowing an agent to act solely because it has access to a model or tool, the control plane introduces explicit governance checks:
 
-Runtime enforcement is performed by deterministic components:
+* Is the agent registered?
+* Is its lifecycle status permitted to execute?
+* Which governance policy is currently active?
+* Which exact policy version made the decision?
+* Does the action's risk score require `ALLOW`, `REVIEW`, or `BLOCK`?
+* Can the resulting decision be traced later?
 
-- Open Policy Agent policies
-- identity and access controls
-- explicit approval gates
-- tool and data permissions
-- spend, token, latency, and iteration budgets
-- rate limits and circuit breakers
-- pause, rollback, and kill-switch controls
+The project separates **agent execution intent** from **governance authority**.
 
----
-
-## Flagship demonstration
-
-The initial governed workload is an **Insurance Claims Resolution Agent** built with LangGraph.
-
-The agent can:
-
-1. retrieve claim and policy information
-2. analyse evidence
-3. recommend a settlement
-4. call customer and payment tools
-5. request specialist review
-6. delegate fraud screening to another agent
-
-The control plane demonstrates the following scenario:
-
-1. A new prompt or model version is submitted through GitHub.
-2. Offline safety, quality, and tool-use evaluations run in CI.
-3. The release gate blocks deployment when thresholds fail.
-4. A runtime agent attempts to access sensitive customer data and approve a high-value settlement.
-5. The policy gateway evaluates identity, agent risk tier, data classification, action value, tool scope, and prior approvals.
-6. The action is denied or paused through a LangGraph human-in-the-loop interrupt.
-7. An authorised reviewer approves, modifies, or rejects the action.
-8. OpenTelemetry and LangSmith traces capture the execution.
-9. The evidence graph links the agent, version, model, prompt, tool call, policy decision, approval, data source, and outcome.
-10. An Assurance Report Agent produces a cited evidence pack and incident timeline.
-
-This single demo shows orchestration, tools, memory, evaluation, observability, policy-as-code, human oversight, GraphRAG, auditability, and incident response.
+> The agent proposes an action.
+> The control plane decides whether that action is permitted.
 
 ---
 
-## Platform capabilities
+## 🧠 The Problem
 
-### 1. Enterprise agent registry
+Enterprise agentic systems introduce a new operational problem.
 
-A central inventory of:
+An AI agent may be technically capable of calling:
 
-- agents and subagents
-- owners and accountable executives
-- business purpose and affected stakeholders
-- risk classification
-- models and model providers
-- prompts and configuration versions
-- tools, MCP servers, and A2A endpoints
-- data sources and classifications
-- memory stores and retention rules
-- deployment environments
-- evaluation status
-- active policy bundle
-- incidents and exceptions
+* payment APIs
+* customer databases
+* internal systems
+* workflow automation
+* external tools
+* privileged enterprise services
 
-Each agent is registered using a version-controlled `agent-manifest.yaml`.
+But **capability is not authorization**.
 
-### 2. Risk and control mapping
+A production AI environment needs an independent layer that can answer:
 
-The Risk Classification Agent:
-
-- screens the use case and autonomy level
-- identifies affected stakeholders
-- identifies data, security, safety, and operational risks
-- proposes a risk tier
-- maps risks to controls
-- records accountable owners
-- creates reassessment triggers
-
-Initial framework mappings:
-
-- Australian Government Guidance for AI Adoption
-- ISO/IEC 42001 AI management systems
-- NIST AI RMF and the Generative AI Profile
-
-The platform provides **control mappings and evidence support**, not legal advice or automatic certification.
-
-### 3. Policy-as-code enforcement
-
-A Policy Enforcement Point intercepts sensitive operations before execution:
-
-- model calls
-- tool calls
-- data retrieval
-- memory reads and writes
-- agent-to-agent delegation
-- external communication
-- financial or customer-impacting actions
-
-It submits structured context to Open Policy Agent and receives one of four decisions:
-
-```json
-{
-  "decision": "require_approval",
-  "reason_codes": [
-    "HIGH_VALUE_ACTION",
-    "SENSITIVE_CUSTOMER_DATA"
-  ],
-  "required_role": "claims_supervisor",
-  "redactions": ["customer.tax_file_number"],
-  "max_validity_seconds": 900
-}
+```text
+WHO is this agent?
+        ↓
+IS it currently permitted to operate?
+        ↓
+WHICH governance policy applies?
+        ↓
+WHAT is the risk of this action?
+        ↓
+ALLOW, REVIEW or BLOCK?
+        ↓
+CAN we prove later why that decision happened?
 ```
 
-Supported outcomes:
-
-- `allow`
-- `deny`
-- `require_approval`
-- `allow_with_obligations`
-
-Obligations can require redaction, stronger authentication, reduced tool scope, additional logging, or post-action review.
-
-### 4. Evaluation and release assurance
-
-LangSmith is used for trace inspection, datasets, experiments, and online/offline evaluations.
-
-Release gates can evaluate:
-
-- task success
-- groundedness and citation correctness
-- tool selection accuracy
-- tool argument correctness
-- unauthorised tool attempts
-- prompt-injection resistance
-- sensitive-data leakage
-- policy compliance
-- delegation correctness
-- loop termination
-- human escalation behaviour
-- latency, token usage, and cost
-- regression against the approved baseline
-
-A model, prompt, policy, tool, or retrieval change creates a new assurance run.
-
-### 5. Runtime supervision
-
-The Runtime Supervisor monitors:
-
-- policy denials and approval requests
-- repeated tool failures
-- excessive delegation depth
-- runaway loops
-- unusual token or cost consumption
-- abnormal latency
-- memory boundary violations
-- anomalous data access
-- evaluation drift
-- model or provider changes
-- tool schema changes
-
-Available interventions:
-
-- pause a thread
-- revoke a tool
-- reduce permissions
-- route to a safer model
-- force human review
-- roll back a deployment
-- quarantine an agent version
-- terminate execution
-
-### 6. Evidence and lineage graph
-
-Neo4j stores the relationships between:
-
-- organisation
-- business process
-- agent
-- agent version
-- subagent
-- model
-- prompt
-- tool
-- MCP server
-- A2A agent
-- dataset
-- data source
-- memory store
-- policy
-- control
-- risk
-- evaluation
-- deployment
-- execution
-- policy decision
-- human approval
-- incident
-- evidence artifact
-
-Example assurance queries:
-
-- Which production agents can access customer PII?
-- Which agents use a model version that failed the latest safety evaluation?
-- Which high-risk actions were approved by a human after a policy denial?
-- Which tools are reachable through an A2A delegation path?
-- What evidence supports the release of agent version `claims-agent:1.4.2`?
-- Which controls would be affected if an MCP server were compromised?
-
-### 7. GraphRAG assurance assistant
-
-The Assurance Assistant combines:
-
-- graph traversal over system lineage and controls
-- semantic retrieval over policies, risk assessments, test reports, incidents, and approvals
-- source-level citations
-- permission-aware retrieval
-
-It answers governance questions using the organisation's evidence rather than relying on model memory.
-
-### 8. Incident investigation and replay
-
-An Incident Investigator Agent:
-
-1. reconstructs the execution timeline
-2. identifies the first policy, tool, data, or model deviation
-3. compares the incident with the approved release baseline
-4. links relevant traces, policy decisions, approvals, and evidence
-5. proposes containment and remediation
-6. generates a reviewable post-incident report
-
-LangGraph checkpoints support controlled replay from selected execution states. Replay is isolated from production tools by default.
+That is the role of this control plane.
 
 ---
 
-## Multi-agent assurance team
+# 🏗 Architecture
 
 ```mermaid
 flowchart LR
-    S[Assurance Supervisor] --> I[Inventory Agent]
-    S --> R[Risk Classification Agent]
-    S --> E[Evaluation Agent]
-    S --> M[Runtime Monitoring Agent]
-    S --> X[Incident Investigator Agent]
-    S --> A[Assurance Report Agent]
 
-    I --> REG[(Agent Registry)]
-    R --> G[(Evidence Graph)]
-    E --> LS[LangSmith]
-    M --> OT[OpenTelemetry]
-    X --> G
-    A --> GR[GraphRAG]
+    A["AI Agent"] --> B["Agent Action Request"]
+
+    B --> C["AgentOps Control Plane"]
+
+    subgraph CP["Governance & Assurance Control Plane"]
+        C --> D["Agent Registry"]
+        D --> E["Lifecycle Enforcement"]
+        E --> F["Active Policy Resolver"]
+        F --> G["Risk Evaluation Engine"]
+        G --> H{"Governance Decision"}
+    end
+
+    H -->|ALLOW| I["ALLOW"]
+    H -->|REVIEW| J["HUMAN REVIEW"]
+    H -->|BLOCK| K["BLOCK"]
+
+    I --> L["Audit Trail"]
+    J --> L
+    K --> L
+
+    L --> M[("SQLite")]
+    D --> M
+    F --> M
+
+    I --> N["Decision Response"]
+    J --> N
+    K --> N
 ```
 
-The supervisor uses LangGraph to coordinate specialist agents, checkpoint case state, request human input, and resume work safely.
+### Control-plane responsibilities
+
+| Layer                 | Responsibility                                                 |
+| --------------------- | -------------------------------------------------------------- |
+| **Agent Registry**    | Identify registered agents and their versions                  |
+| **Lifecycle Control** | Enforce `REGISTERED`, `SUSPENDED`, and `RETIRED` states        |
+| **Policy Registry**   | Store governance policies independently from application code  |
+| **Policy Versioning** | Preserve immutable historical policy versions                  |
+| **Approval Workflow** | Prevent draft policies from becoming active without approval   |
+| **Risk Engine**       | Convert action risk into `ALLOW`, `REVIEW`, or `BLOCK`         |
+| **Audit Trail**       | Record decision, reason, agent, risk score and policy identity |
+| **API Layer**         | Expose governance controls through FastAPI                     |
 
 ---
 
-## High-level architecture
+# 🚦 Runtime Governance Flow
+
+Every governed action passes through lifecycle enforcement **before risk evaluation**.
 
 ```mermaid
-flowchart TB
-    USERS[Risk, Audit, Security, Platform and Product Teams]
-    GIT[GitHub and CI/CD]
-    UI[Governance Console]
-    API[Control Plane API]
+flowchart TD
 
-    subgraph CONTROL["Governance Control Plane"]
-        REG[Agent Registry]
-        RISK[Risk and Control Service]
-        EVAL[Evaluation and Release Gate]
-        PDP[OPA Policy Decision Point]
-        ASSURE[LangGraph Assurance Orchestrator]
-        EVIDENCE[Evidence and Lineage Service]
-        INCIDENT[Incident and Case Service]
-    end
+    A["Agent requests an action"] --> B{"Agent registered?"}
 
-    subgraph DATA["Governed Agent Data Plane"]
-        SDK[Agent Governance SDK]
-        PEP[Policy Enforcement Gateway]
-        AGENT[LangGraph Agent Runtime]
-        A2A[A2A Remote Agents]
-        MCP[MCP Tool Servers]
-        TOOLS[Enterprise APIs and Data]
-    end
+    B -->|No| X["REJECT • 404"]
 
-    subgraph OBS["Observability and Evidence"]
-        LS[LangSmith]
-        OTEL[OpenTelemetry Collector]
-        PG[(PostgreSQL)]
-        NEO[(Neo4j)]
-        OBJ[(MinIO or Object Storage)]
-        GRAF[Prometheus and Grafana]
-    end
+    B -->|Yes| C{"Lifecycle status"}
 
-    USERS --> UI --> API
-    GIT --> EVAL
-    API --> REG
-    API --> RISK
-    API --> ASSURE
-    API --> INCIDENT
-    RISK --> PDP
-    EVAL --> LS
-    ASSURE --> EVIDENCE
+    C -->|SUSPENDED| Y["REJECT • 403"]
+    C -->|RETIRED| Y
+    C -->|REGISTERED| D["Load ACTIVE governance policy"]
 
-    AGENT --> SDK --> PEP
-    PEP --> PDP
-    PEP --> MCP
-    PEP --> A2A
-    MCP --> TOOLS
-    A2A --> TOOLS
+    D --> E{"Evaluate risk score"}
 
-    SDK --> LS
-    SDK --> OTEL
-    PEP --> OTEL
-    PDP --> OTEL
+    E -->|"score < review threshold"| F["ALLOW"]
 
-    REG --> PG
-    RISK --> PG
-    EVIDENCE --> NEO
-    EVIDENCE --> OBJ
-    OTEL --> GRAF
+    E -->|"review threshold ≤ score < block threshold"| G["REVIEW"]
+
+    E -->|"score ≥ block threshold"| H["BLOCK"]
+
+    F --> I["Record audit decision"]
+    G --> I
+    H --> I
+
+    I --> J["Store policy ID + name + version + reason"]
 ```
 
----
+### Example
 
-## Runtime authorisation sequence
-
-```mermaid
-sequenceDiagram
-    participant A as Governed Agent
-    participant G as Policy Gateway
-    participant O as OPA
-    participant H as Human Reviewer
-    participant T as Enterprise Tool
-    participant E as Evidence Service
-
-    A->>G: Request tool action + execution context
-    G->>O: Evaluate policy input
-    O-->>G: require_approval + obligations
-    G-->>A: Pause execution
-    G->>H: Approval request with evidence
-    H-->>G: Approve with reduced limit
-    G->>O: Re-evaluate with approval claim
-    O-->>G: allow_with_obligations
-    G->>T: Execute scoped action
-    T-->>G: Tool result
-    G->>E: Record decision, approval, action and result
-    G-->>A: Resume workflow
-```
-
----
-
-## Memory model
-
-The platform separates memory by purpose and trust boundary.
-
-| Memory class | Technology | Scope | Examples |
-|---|---|---|---|
-| Working state | LangGraph checkpoint | One execution thread | current task, pending approval, retry state |
-| Case memory | PostgreSQL | One governed case | decisions, reviewer comments, exceptions |
-| Governance memory | PostgreSQL + Neo4j | Tenant and system scoped | risks, controls, owners, lineage |
-| Knowledge memory | GraphRAG indexes | Permission scoped | policies, standards, test reports |
-| Telemetry retention | LangSmith + OpenTelemetry backend | Environment and tenant scoped | traces, metrics, events |
-
-No unrestricted cross-tenant or cross-purpose memory is allowed.
-
----
-
-## Technology stack
-
-| Layer | Initial choice |
-|---|---|
-| Agent orchestration | LangGraph |
-| Agent tracing and evaluation | LangSmith |
-| API | FastAPI + Pydantic |
-| Web console | Next.js + TypeScript |
-| Policy decision engine | Open Policy Agent |
-| Agent/tool interoperability | MCP and A2A |
-| Distributed telemetry | OpenTelemetry |
-| Infrastructure monitoring | Prometheus + Grafana |
-| Registry and case data | PostgreSQL |
-| Evidence and lineage graph | Neo4j |
-| Artifact storage | MinIO locally; cloud object storage in production |
-| Event transport | NATS JetStream |
-| Identity | OIDC; Keycloak locally |
-| Packaging | Docker Compose for MVP |
-| Production target | Kubernetes + Terraform |
-| Testing | Pytest, Ruff, mypy, Playwright |
-| CI/CD | GitHub Actions |
-
-### Why both LangSmith and OpenTelemetry?
-
-- **LangSmith** provides agent-native traces, datasets, experiments, evaluators, and production quality analysis.
-- **OpenTelemetry** provides vendor-neutral traces, metrics, and logs across APIs, policy gateways, databases, queues, and infrastructure.
-
-The control plane correlates both using shared tenant, agent, version, execution, trace, and case identifiers.
-
-Sensitive prompt, completion, tool, and retrieved content is redacted or omitted by default. Content capture is explicitly policy-controlled.
-
----
-
-## Proposed repository structure
+Given an active policy:
 
 ```text
-agentops-governance-control-plane/
-├── apps/
-│   ├── control-plane-api/          # FastAPI
-│   └── governance-console/         # Next.js
-├── agents/
-│   ├── assurance-supervisor/       # LangGraph supervisor
-│   ├── risk-classifier/
-│   ├── evaluation-agent/
-│   ├── incident-investigator/
-│   ├── assurance-reporter/
-│   └── demo-claims-agent/
-├── packages/
-│   ├── governance-sdk/             # Runtime interception and context
-│   ├── policy-client/
-│   ├── telemetry/
-│   ├── evidence-model/
-│   └── agent-manifest/
-├── services/
-│   ├── policy-gateway/
-│   ├── evidence-service/
-│   ├── graph-rag-service/
-│   └── approval-service/
-├── policies/
-│   ├── rego/
-│   ├── bundles/
-│   └── tests/
-├── evals/
-│   ├── datasets/
-│   ├── evaluators/
-│   └── release-gates/
-├── examples/
-│   ├── agent-manifest.example.yaml
-│   └── policy-input.example.json
-├── docs/
-│   ├── architecture.md
-│   ├── governance-mappings.md
-│   ├── threat-model.md
-│   └── roadmap.md
-├── infra/
-│   ├── docker/
-│   ├── kubernetes/
-│   └── terraform/
-├── .github/workflows/
-├── docker-compose.yml
-├── pyproject.toml
-├── package.json
-├── Makefile
+Review threshold = 0.40
+Block threshold  = 0.70
+```
+
+The engine evaluates:
+
+| Risk Score | Result      |
+| ---------: | ----------- |
+|     `0.20` | ✅ `ALLOW`   |
+|     `0.40` | ⚠️ `REVIEW` |
+|     `0.65` | ⚠️ `REVIEW` |
+|     `0.70` | ⛔ `BLOCK`   |
+|     `0.95` | ⛔ `BLOCK`   |
+
+---
+
+# 🤖 Agent Registry
+
+Agents are persisted in SQLite rather than existing only for the lifetime of an API request.
+
+Each registered version records:
+
+```text
+agent_id
+name
+version
+owner
+purpose
+risk_tier
+status
+created_at
+updated_at
+```
+
+### Risk tiers
+
+```text
+LOW
+MEDIUM
+HIGH
+CRITICAL
+```
+
+### Lifecycle states
+
+```mermaid
+stateDiagram-v2
+
+    [*] --> REGISTERED
+
+    REGISTERED --> SUSPENDED: suspend
+
+    SUSPENDED --> REGISTERED: reactivate
+
+    REGISTERED --> RETIRED: retire
+
+    SUSPENDED --> RETIRED: retire
+
+    RETIRED --> [*]
+```
+
+A retired version is terminal and cannot be reactivated.
+
+---
+
+# 📜 Policy Lifecycle
+
+Governance policies are stored separately from the API implementation.
+
+Thresholds therefore do not need to remain hard-coded inside `main.py`.
+
+```mermaid
+flowchart LR
+
+    A["Create Policy"] --> B["DRAFT"]
+
+    B -->|approve| C["APPROVED"]
+
+    C -->|activate| D["ACTIVE"]
+
+    D -->|replaced by another policy| C
+
+    D -->|create new version| E["New DRAFT Version"]
+
+    E -->|approve| F["APPROVED"]
+
+    F -->|activate| G["ACTIVE"]
+```
+
+### Example policy history
+
+```text
+strict-enterprise-policy v1
+        ↓
+     APPROVED
+
+strict-enterprise-policy v2
+        ↓
+      ACTIVE
+
+strict-enterprise-policy v3
+        ↓
+       DRAFT
+```
+
+Versions are stored as separate records rather than overwriting previous governance rules.
+
+This preserves historical explainability.
+
+---
+
+# 🔍 Decision Traceability
+
+A governance decision records the policy that caused it.
+
+Example:
+
+```json
+{
+  "decision": "BLOCK",
+  "reason": "Risk score exceeds block threshold 0.7.",
+  "risk_score": 0.82,
+  "policy_id": 4,
+  "policy_name": "strict-enterprise-policy",
+  "policy_version": 2
+}
+```
+
+The corresponding audit record can later identify:
+
+```text
+Agent
+Action
+Risk Score
+Decision
+Reason
+Policy ID
+Policy Name
+Policy Version
+Timestamp
+```
+
+This avoids a common governance failure:
+
+> "The system blocked this action, but we no longer know which rules were active at the time."
+
+---
+
+# ✅ Implemented Capabilities
+
+| Capability                           | Status |
+| ------------------------------------ | :----: |
+| FastAPI control-plane API            |    ✅   |
+| Health endpoint                      |    ✅   |
+| Basic agent manifest validation      |    ✅   |
+| Persistent SQLite agent registry     |    ✅   |
+| Multiple agent versions              |    ✅   |
+| Agent risk tiers                     |    ✅   |
+| Agent lifecycle management           |    ✅   |
+| Suspend agent                        |    ✅   |
+| Reactivate agent                     |    ✅   |
+| Retire agent                         |    ✅   |
+| Prevent suspended agent execution    |    ✅   |
+| Prevent retired agent execution      |    ✅   |
+| Prevent unregistered agent execution |    ✅   |
+| Governance policy registry           |    ✅   |
+| Policy versioning                    |    ✅   |
+| Draft policy state                   |    ✅   |
+| Explicit policy approval             |    ✅   |
+| Active policy management             |    ✅   |
+| Risk-based `ALLOW / REVIEW / BLOCK`  |    ✅   |
+| Governance audit trail               |    ✅   |
+| Audit filtering                      |    ✅   |
+| Policy ID traceability               |    ✅   |
+| Policy version traceability          |    ✅   |
+| Audit rejected lifecycle attempts    |   🔜   |
+| Authentication / RBAC                |   🔜   |
+| Tamper-evident audit chain           |   🔜   |
+| PostgreSQL persistence               |   🔜   |
+| Observability / telemetry            |   🔜   |
+
+---
+
+# 🔌 API Surface
+
+## System
+
+| Method | Endpoint  | Purpose          |
+| ------ | --------- | ---------------- |
+| `GET`  | `/`       | Service metadata |
+| `GET`  | `/health` | Health check     |
+
+## Agent Registry
+
+| Method | Endpoint                        | Purpose                           |
+| ------ | ------------------------------- | --------------------------------- |
+| `POST` | `/validate-manifest`            | Validate required manifest fields |
+| `POST` | `/register-agent`               | Persist a new agent/version       |
+| `GET`  | `/agents`                       | List/filter registered agents     |
+| `GET`  | `/agents/{agent_id}`            | Retrieve all versions of an agent |
+| `POST` | `/agents/{agent_id}/suspend`    | Suspend latest agent version      |
+| `POST` | `/agents/{agent_id}/reactivate` | Reactivate suspended version      |
+| `POST` | `/agents/{agent_id}/retire`     | Permanently retire latest version |
+
+## Governance
+
+| Method | Endpoint               | Purpose                  |
+| ------ | ---------------------- | ------------------------ |
+| `POST` | `/governance/evaluate` | Evaluate an agent action |
+
+## Policies
+
+| Method | Endpoint                         | Purpose                     |
+| ------ | -------------------------------- | --------------------------- |
+| `GET`  | `/policies`                      | List all policy versions    |
+| `POST` | `/policies`                      | Create policy v1 as `DRAFT` |
+| `GET`  | `/policies/{policy_id}/versions` | List policy version history |
+| `POST` | `/policies/{policy_id}/versions` | Create next policy version  |
+| `POST` | `/policies/{policy_id}/approve`  | Approve a draft policy      |
+| `POST` | `/policies/{policy_id}/activate` | Activate an approved policy |
+
+## Audit
+
+| Method | Endpoint | Purpose                           |
+| ------ | -------- | --------------------------------- |
+| `GET`  | `/audit` | Query governance decision history |
+
+Audit supports filters including:
+
+```text
+agent_id
+decision
+policy_id
+limit
+```
+
+---
+
+# ⚡ Quick Start
+
+## 1. Clone the repository
+
+```cmd
+git clone YOUR_REPOSITORY_URL
+
+cd "AgentOps Governance & Assurance Control Plane"
+```
+
+## 2. Create the Python environment
+
+```cmd
+python -m venv .venv
+```
+
+## 3. Activate it on Windows
+
+```cmd
+.venv\Scripts\activate
+```
+
+## 4. Install dependencies
+
+```cmd
+python -m pip install -r requirements.txt
+```
+
+## 5. Start the control plane
+
+```cmd
+python -m uvicorn app.main:app --reload
+```
+
+API:
+
+```text
+http://127.0.0.1:8000
+```
+
+Interactive Swagger documentation:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+---
+
+# 🧪 Example Workflow
+
+## 1. Register an agent
+
+```cmd
+curl -X POST "http://127.0.0.1:8000/register-agent" -H "Content-Type: application/json" -d "{\"agent_id\":\"refund-agent\",\"name\":\"Refund Agent\",\"version\":\"1.0.0\",\"owner\":\"payments-ai\",\"purpose\":\"Evaluate customer refund requests\",\"risk_tier\":\"HIGH\"}"
+```
+
+---
+
+## 2. Evaluate an action
+
+```cmd
+curl -X POST "http://127.0.0.1:8000/governance/evaluate" -H "Content-Type: application/json" -d "{\"agent_id\":\"refund-agent\",\"action\":\"process_refund\",\"risk_score\":0.82}"
+```
+
+Example response:
+
+```json
+{
+  "decision": "BLOCK",
+  "reason": "Risk score exceeds block threshold 0.7.",
+  "risk_score": 0.82,
+  "policy_id": 4,
+  "policy_name": "strict-enterprise-policy",
+  "policy_version": 2
+}
+```
+
+---
+
+## 3. Suspend the agent
+
+```cmd
+curl -X POST "http://127.0.0.1:8000/agents/refund-agent/suspend"
+```
+
+The agent can no longer pass the lifecycle enforcement gate.
+
+---
+
+## 4. Attempt another action
+
+```cmd
+curl -i -X POST "http://127.0.0.1:8000/governance/evaluate" -H "Content-Type: application/json" -d "{\"agent_id\":\"refund-agent\",\"action\":\"process_refund\",\"risk_score\":0.20}"
+```
+
+Expected:
+
+```text
+HTTP/1.1 403 Forbidden
+```
+
+The risk score is irrelevant because the lifecycle gate executes first.
+
+---
+
+## 5. Reactivate
+
+```cmd
+curl -X POST "http://127.0.0.1:8000/agents/refund-agent/reactivate"
+```
+
+---
+
+# 🧩 Project Structure
+
+```text
+AgentOps Governance & Assurance Control Plane/
+│
+├── app/
+│   ├── __init__.py
+│   │
+│   ├── main.py
+│   │   └── FastAPI routes and control-plane orchestration
+│   │
+│   ├── models.py
+│   │   └── Pydantic request and response models
+│   │
+│   ├── agents.py
+│   │   └── Agent registry and lifecycle persistence
+│   │
+│   ├── policies.py
+│   │   └── Policy registry, versions, approval and activation
+│   │
+│   └── audit.py
+│       └── Governance decision audit persistence
+│
+├── agent_registry.db
+│   └── Local SQLite persistence
+│
+├── requirements.txt
+│
 └── README.md
 ```
 
 ---
 
-## MVP scope
+# 🧭 Control-Plane Design Principles
 
-### Milestone 1: Govern one agent
+### 1. Identity before execution
 
-- agent manifest schema
-- registry API
-- demo claims agent
-- governance SDK
-- OPA policy gateway
-- allow, deny, and approval decisions
-- LangGraph interrupt and resume
-- PostgreSQL persistence
-- basic web console
+An unknown agent cannot enter normal governance evaluation.
 
-### Milestone 2: Prove release assurance
+### 2. Lifecycle before risk
 
-- LangSmith tracing
-- evaluation datasets
-- safety, tool-use, and regression evaluators
-- GitHub release gate
-- model and prompt version comparison
-- release evidence record
+A suspended or retired agent is rejected regardless of its reported risk score.
 
-### Milestone 3: Build the evidence graph
+### 3. Policies are data
 
-- Neo4j evidence model
-- execution and lineage ingestion
-- GraphRAG assurance assistant
-- cited assurance answers
-- control-to-evidence coverage view
+Governance thresholds are persisted policies rather than scattered constants inside application logic.
 
-### Milestone 4: Multi-agent and tool governance
+### 4. Policy changes are versioned
 
-- A2A Agent Card registration
-- MCP tool discovery
-- delegated task lineage
-- per-agent and per-tool scopes
-- memory boundary controls
-- delegation-depth and budget policies
+Changing governance rules creates another policy version instead of destroying historical configuration.
 
-### Milestone 5: Incident and enterprise hardening
+### 5. Promotion is explicit
 
-- anomaly rules
-- incident case workflow
-- controlled replay
-- kill switch and quarantine
-- OIDC, RBAC, and ABAC
-- multi-tenant isolation
-- signed policy bundles
-- Kubernetes and Terraform deployment
+```text
+DRAFT → APPROVED → ACTIVE
+```
+
+Policy creation alone cannot silently modify the active governance regime.
+
+### 6. Decisions carry provenance
+
+Every normal governance decision identifies the policy and version responsible for it.
+
+### 7. Registry, policy and audit concerns remain separated
+
+The API orchestrates independent governance components rather than placing all persistence logic inside one file.
 
 ---
 
-## Initial policy examples
+# 🗃 Current Persistence Model
 
-The first policy pack should enforce:
+```mermaid
+erDiagram
 
-1. Production agents must be registered and have an accountable owner.
-2. High-risk agents cannot deploy without a current passing evaluation.
-3. Sensitive tools require explicit declared scopes.
-4. Customer-impacting actions above a threshold require human approval.
-5. Restricted data fields are redacted unless purpose and role permit access.
-6. Agent-to-agent delegation must preserve user, tenant, purpose, and trace identity.
-7. Unapproved models, prompts, tools, or MCP servers are denied.
-8. Memory writes require a declared retention class.
-9. Maximum delegation depth, execution time, tool calls, tokens, and cost are enforced.
-10. Repeated denials or abnormal behaviour quarantine the agent version.
+    AGENTS {
+        int id
+        string agent_id
+        string name
+        string version
+        string owner
+        string purpose
+        string risk_tier
+        string status
+        string created_at
+        string updated_at
+    }
 
----
+    GOVERNANCE_POLICIES {
+        int id
+        string name
+        int version
+        float review_threshold
+        float block_threshold
+        int active
+        string status
+        string approved_by
+        string approved_at
+        string created_at
+    }
 
-## Governance alignment
+    GOVERNANCE_AUDIT {
+        int id
+        string agent_id
+        string action
+        float risk_score
+        string decision
+        string reason
+        int policy_id
+        string policy_name
+        int policy_version
+        string created_at
+    }
 
-The project is designed to generate and preserve evidence for:
+    AGENTS ||--o{ GOVERNANCE_AUDIT : generates
+    GOVERNANCE_POLICIES ||--o{ GOVERNANCE_AUDIT : governs
+```
 
-### Australian Government Guidance for AI Adoption
-
-1. Decide who is accountable
-2. Understand impacts and plan accordingly
-3. Measure and manage risks
-4. Share essential information
-5. Test and monitor
-6. Maintain human control
-
-### ISO/IEC 42001
-
-- organisational accountability
-- AI policy and objectives
-- risk management
-- lifecycle and data controls
-- transparency
-- performance evaluation
-- continual improvement
-
-### NIST AI RMF
-
-- Govern
-- Map
-- Measure
-- Manage
-
-No framework mapping should be represented as proof of compliance without qualified review.
-
----
-
-## Success metrics
-
-The MVP should demonstrate measurable outcomes:
-
-- 100% of governed production actions linked to an agent and version
-- 100% of high-impact tool calls evaluated by policy
-- 100% of approval decisions linked to an authenticated reviewer
-- complete evidence lineage for the flagship demo
-- failed release evaluations block deployment
-- unauthorised tool and data requests are denied
-- incidents can be reconstructed from correlated evidence
-- assurance questions return cited, permission-filtered answers
-- agent execution can be paused or terminated within the control objective
-- no sensitive content captured in telemetry without explicit policy permission
+> The diagram represents the logical governance relationships. The current SQLite implementation does not yet enforce all of these relationships as database foreign-key constraints.
 
 ---
 
-## Non-goals for the first release
+# 🛣 Roadmap
 
-- replacing enterprise GRC platforms
-- automatically declaring legal or regulatory compliance
-- allowing an LLM to override deterministic security policy
-- supporting every agent framework at launch
-- building a proprietary model gateway
-- storing unrestricted prompts or completions by default
-- implementing autonomous remediation in production without approval
+```mermaid
+flowchart LR
+
+    A["Agent Registry ✅"] --> B["Lifecycle Enforcement ✅"]
+
+    B --> C["Versioned Policies ✅"]
+
+    C --> D["Approval Workflow ✅"]
+
+    D --> E["Decision Traceability ✅"]
+
+    E --> F["Denied-Event Auditing"]
+
+    F --> G["RBAC + Authentication"]
+
+    G --> H["Tamper-Evident Audit"]
+
+    H --> I["PostgreSQL"]
+
+    I --> J["OpenTelemetry"]
+
+    J --> K["Enterprise Policy Assignment"]
+
+    K --> L["Distributed Agent Governance"]
+```
+
+### Near-term
+
+* Log attempted execution by suspended and retired agents
+* Log unknown/unregistered-agent enforcement events
+* Separate enforcement events from normal governance decisions
+* Add actor identity to administrative changes
+* Add policy assignment by agent/risk tier
+* Add API authentication and role-based authorization
+
+### Later
+
+* PostgreSQL persistence
+* Database migration framework
+* Cryptographic/tamper-evident audit chain
+* OpenTelemetry traces and metrics
+* Governance dashboards
+* External policy engines
+* Human-review workflow
+* Tool-level authorization
+* Distributed control-plane deployment
 
 ---
 
-## Design references
+# ⚠️ Current Boundaries
 
-- [Australian Government Guidance for AI Adoption](https://www.ai.gov.au/staying-safe-and-responsible/essential-ai-practices/guidance-ai-adoption-implementation-guidance)
-- [ISO/IEC 42001 AI management systems](https://www.iso.org/standard/42001)
-- [NIST AI Risk Management Framework](https://www.nist.gov/itl/ai-risk-management-framework)
-- [LangGraph documentation](https://docs.langchain.com/oss/python/langgraph/overview)
-- [LangSmith documentation](https://docs.langchain.com/langsmith/observability)
-- [Open Policy Agent](https://www.openpolicyagent.org/docs/latest/)
-- [OpenTelemetry](https://opentelemetry.io/)
-- [Model Context Protocol](https://modelcontextprotocol.io/specification/2025-11-25)
-- [Agent2Agent Protocol](https://a2a-protocol.org/latest/)
+The current implementation deliberately remains focused.
+
+At this stage:
+
+* SQLite is the persistence layer
+* one active governance policy is applied globally
+* the caller supplies the action `risk_score`
+* authentication and RBAC are not yet implemented
+* lifecycle-rejected requests are not yet persisted to the audit table
+* the API returns the governance decision but does not itself invoke downstream enterprise tools
+
+These are explicit roadmap items rather than hidden assumptions.
+
+---
+
+# 🌐 Target Architecture
+
+The long-term direction is a control plane positioned between autonomous agents and enterprise execution surfaces:
+
+```text
+┌───────────────────────────────────────────────────────────┐
+│                    Enterprise AI Estate                   │
+│                                                           │
+│   Agent A        Agent B        Agent C        Agent N     │
+└──────┬──────────────┬──────────────┬──────────────┬───────┘
+       │              │              │              │
+       └──────────────┴──────┬───────┴──────────────┘
+                             │
+                             ▼
+              ┌─────────────────────────────┐
+              │       AgentOps Control      │
+              │            Plane            │
+              │                             │
+              │  Identity                   │
+              │  Lifecycle                  │
+              │  Policy                     │
+              │  Risk                       │
+              │  Approval                   │
+              │  Enforcement                │
+              │  Audit                      │
+              └──────────────┬──────────────┘
+                             │
+               ALLOW / REVIEW / BLOCK
+                             │
+                             ▼
+              ┌─────────────────────────────┐
+              │ Enterprise Tools & Systems  │
+              │                             │
+              │ APIs • Data • SaaS • Cloud │
+              └─────────────────────────────┘
+```
+
+---
+
+<div align="center">
+
+## 🛡️ Govern the agent. Version the policy. Trace the decision.
+
+**AgentOps Governance & Assurance Control Plane**
+
+Built as an evolving reference implementation for runtime governance of enterprise AI agents.
+
+</div>
