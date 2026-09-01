@@ -5,7 +5,9 @@ from fastapi import FastAPI, HTTPException, Query
 from app.agents import (
     get_agents,
     get_agent_versions,
+    get_latest_agent,
     register_agent_record,
+    update_latest_agent_status,
 )
 
 from app.audit import (
@@ -37,10 +39,10 @@ app = FastAPI(
     title="AgentOps Governance & Assurance Control Plane",
     description=(
         "Governance, assurance, policy evaluation, "
-        "agent registry, and audit control plane "
-        "for AI agents."
+        "agent registry, lifecycle enforcement, "
+        "and audit control plane for AI agents."
     ),
-    version="1.0.0",
+    version="1.1.0",
 )
 
 
@@ -50,7 +52,7 @@ def root():
         "service": (
             "AgentOps Governance & Assurance Control Plane"
         ),
-        "version": "1.0.0",
+        "version": "1.1.0",
         "status": "running",
     }
 
@@ -188,6 +190,90 @@ def get_registered_agent(
     }
 
 
+@app.post("/agents/{agent_id}/suspend")
+def suspend_agent(
+    agent_id: str,
+):
+    try:
+        agent = update_latest_agent_status(
+            agent_id=agent_id,
+            new_status="SUSPENDED",
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    if agent is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Agent not found.",
+        )
+
+    return {
+        "message": "Agent suspended.",
+        "agent": agent,
+    }
+
+
+@app.post("/agents/{agent_id}/reactivate")
+def reactivate_agent(
+    agent_id: str,
+):
+    try:
+        agent = update_latest_agent_status(
+            agent_id=agent_id,
+            new_status="REGISTERED",
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    if agent is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Agent not found.",
+        )
+
+    return {
+        "message": "Agent reactivated.",
+        "agent": agent,
+    }
+
+
+@app.post("/agents/{agent_id}/retire")
+def retire_agent(
+    agent_id: str,
+):
+    try:
+        agent = update_latest_agent_status(
+            agent_id=agent_id,
+            new_status="RETIRED",
+        )
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
+    if agent is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Agent not found.",
+        )
+
+    return {
+        "message": "Agent retired.",
+        "agent": agent,
+    }
+
+
 @app.post(
     "/governance/evaluate",
     response_model=GovernanceDecision,
@@ -195,6 +281,29 @@ def get_registered_agent(
 def evaluate_governance(
     request: AgentActionRequest,
 ):
+    agent = get_latest_agent(
+        request.agent_id
+    )
+
+    if agent is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Agent '{request.agent_id}' "
+                "is not registered."
+            ),
+        )
+
+    if agent["status"] != "REGISTERED":
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Agent '{request.agent_id}' "
+                f"is {agent['status']} and cannot "
+                "execute governed actions."
+            ),
+        )
+
     policy = get_active_policy()
 
     if policy is None:
