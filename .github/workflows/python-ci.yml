@@ -12,11 +12,26 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: agentops-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+
 jobs:
   validate-api:
-    name: Validate FastAPI application
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
 
     steps:
       - name: Download repository
@@ -25,14 +40,17 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
           cache: pip
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
 
-      - name: Install project dependencies
-        run: pip install -r requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Verify dependency compatibility
+        run: python -m pip check
 
       - name: Check Python syntax
         run: python -m compileall -q app
@@ -45,6 +63,6 @@ jobs:
         run: |
           python -c "from app.main import app; schema = app.openapi(); assert schema.get('paths'), 'No API routes found'; print('Validated routes:', len(schema['paths']))"
 
-      - name: Display registered routes
+      - name: Display registered API routes
         run: |
           python -c "from app.main import app; print('\n'.join(sorted({route.path for route in app.routes})))"
