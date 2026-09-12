@@ -1,0 +1,50 @@
+name: AgentOps Python CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-api:
+    name: Validate FastAPI application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install project dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check Python syntax
+        run: python -m compileall -q app
+
+      - name: Import FastAPI application
+        run: |
+          python -c "from app.main import app; print('Loaded API:', app.title)"
+
+      - name: Validate OpenAPI schema
+        run: |
+          python -c "from app.main import app; schema = app.openapi(); assert schema.get('paths'), 'No API routes found'; print('Validated routes:', len(schema['paths']))"
+
+      - name: Display registered routes
+        run: |
+          python -c "from app.main import app; print('\n'.join(sorted({route.path for route in app.routes})))"
